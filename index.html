@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>فتح الله ماركت — التسجيل اليومي لدرجات الحرارة</title>
+    <style>
+        body { font-family: Tahoma, Arial, sans-serif; background: #f4f7f6; margin: 0; padding: 15px; color: #333; }
+        .container { max-width: 800px; margin: auto; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        h2 { text-align: center; color: #1a4f7f; margin-top: 0; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        select, input[type="date"], input[type="number"] { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; font-size: 15px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: center; }
+        th { background-color: #1a4f7f; color: white; }
+        button { background-color: #1a4f7f; color: white; padding: 12px 20px; border: none; border-radius: 4px; cursor: pointer; width: 100%; font-size: 16px; margin-top: 20px; font-weight: bold; }
+        button:hover { background-color: #123559; }
+        .loading { text-align: center; color: #666; font-style: italic; margin-top: 15px; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>تسجيل درجات حرارة الثلاجات اليومي</h2>
+    
+    <div class="form-group">
+        <label for="branchSelect">اختر الفرع:</label>
+        <select id="branchSelect" onchange="loadFridges()">
+            <option value="">-- اختر الفرع --</option>
+            <option value="المحلة">المحلة</option>
+            <option value="دمنهور">دمنهور</option>
+            <option value="دمنهور الاستاد">دمنهور الاستاد</option>
+            <option value="دمياط">دمياط</option>
+            <option value="طنطا">طنطا</option>
+            <option value="طنطا اوتلت">طنطا اوتلت</option>
+            <option value="كفر الدوار">كفر الدوار</option>
+            <option value="كفر الدوار مول">كفر الدوار مول</option>
+            <option value="استانلي">استانلي</option>
+            <option value="الابراهيمية">الابراهيمية</option>
+            <option value="الابراهيمية الميني">الابراهيمية الميني</option>
+            <option value="الانفوشى">الانفوشى</option>
+            <option value="النصر">النصر</option>
+            <option value="جاردنيا">جاردنيا</option>
+            <option value="سموحة">سموحة</option>
+            <option value="سموحة الميني">سموحة الميني</option>
+            <option value="سيتى سكوير">سيتى سكوير</option>
+            <option value="سيدى جابر المحطة">سيدى جابر المحطة</option>
+            <option value="سيدي بشر ميني">سيدي بشر ميني</option>
+            <option value="سيدي جابر ميني">سيدي جابر ميني</option>
+            <option value="طوسون">طوسون</option>
+            <option value="فلمنج">فلمنج</option>
+            <option value="ملك حفني">ملك حفني</option>
+            <option value="ابو يوسف">ابو يوسف</option>
+            <option value="الهانوفيل">الهانوفيل</option>
+            <option value="اكتوبر">اكتوبر</option>
+            <option value="الدخيلة 1 ميني">الدخيلة 1 ميني</option>
+            <option value="الدخيلة 2 ميني">الدخيلة 2 ميني</option>
+            <option value="عجمى ستار">عجمى ستار</option>
+            <option value="مطروح">مطروح</option>
+            <option value="الرحاب">الرحاب</option>
+        </select>
+    </div>
+
+    <div class="form-group">
+        <label for="recordDate">التاريخ:</label>
+        <input type="date" id="recordDate">
+    </div>
+
+    <div id="loadingMessage" class="loading" style="display:none;">جاري تحميل الثلاجات الخاصه بالفرع...</div>
+
+    <form id="dailyForm" onsubmit="submitDailyData(event)" style="display:none;">
+        <table id="fridgesTable">
+            <thead>
+                <tr>
+                    <th>القسم</th>
+                    <th>رمز الثلاجة</th>
+                    <th>النوع</th>
+                    <th>درجة الحرارة (°م)</th>
+                    <th>الحالة</th>
+                </tr>
+            </thead>
+            <tbody id="tableBody">
+                <!-- الصفوف تظهر أوتوماتيك -->
+            </tbody>
+        </table>
+        <button type="submit">إرسال القراءات اليومية</button>
+    </form>
+</div>
+
+<script>
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbycG7Fld1-DO3kCcW-GotiiSPkzHpAwNL0lpmdfLpE8_bB_nh-mp8egD0cYcjPIIICI_A/exec";
+
+    const today = new Date();
+    document.getElementById('recordDate').value = today.toISOString().split('T')[0];
+
+    let currentFridges = [];
+
+    function loadFridges() {
+        const branch = document.getElementById('branchSelect').value;
+        const loading = document.getElementById('loadingMessage');
+        const form = document.getElementById('dailyForm');
+        
+        if (!branch) {
+            form.style.display = 'none';
+            return;
+        }
+
+        loading.style.display = 'block';
+        form.style.display = 'none';
+
+        fetch(`${SCRIPT_URL}?action=getFridges&branch=${encodeURIComponent(branch)}`)
+            .then(res => res.json())
+            .then(data => {
+                loading.style.display = 'none';
+                if (data.status === 'success') {
+                    currentFridges = data.fridges;
+                    if (currentFridges.length === 0) {
+                        alert('لا توجد ثلاجات مسجلة لهذا الفرع في شيت الإعداد. يرجى إضافتها من فورم الإعداد أولاً.');
+                        return;
+                    }
+                    renderTable(currentFridges);
+                    form.style.display = 'block';
+                } else {
+                    alert('خطأ: ' + data.message);
+                }
+            })
+            .catch(err => {
+                loading.style.display = 'none';
+                alert('حدثت مشكلة في الاتصال بالخادم.');
+            });
+    }
+
+    function renderTable(fridges) {
+        const tbody = document.getElementById('tableBody');
+        tbody.innerHTML = '';
+
+        fridges.forEach((f, index) => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${f.section}</td>
+                <td>${f.code}</td>
+                <td>${f.type}</td>
+                <td><input type="number" step="0.1" required id="temp_${index}" placeholder="مثال: 4 أو -18"></td>
+                <td>
+                    <select id="status_${index}">
+                        <option value="سليم">سليم</option>
+                        <option value="به عطل">به عطل</option>
+                        <option value="صيانة">تحت الصيانة</option>
+                    </select>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+
+    function submitDailyData(e) {
+        e.preventDefault();
+        const branch = document.getElementById('branchSelect').value;
+        const date = document.getElementById('recordDate').value;
+
+        const readings = currentFridges.map((f, index) => {
+            return {
+                section: f.section,
+                code: f.code,
+                type: f.type,
+                temp: document.getElementById(`temp_${index}`).value,
+                status: document.getElementById(`status_${index}`).value
+            };
+        });
+
+        const payload = {
+            action: "submitDaily",
+            branch: branch,
+            date: date,
+            readings: readings
+        };
+
+        const submitBtn = e.target.querySelector('button');
+        submitBtn.disabled = true;
+        submitBtn.innerText = 'جاري الإرسال...';
+
+        fetch(SCRIPT_URL, {
+            method: 'POST',
+            mode: 'no-cors',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        })
+        .then(() => {
+            alert('تم تسجيل درجات الحرارة بنجاح!');
+            document.getElementById('dailyForm').reset();
+            document.getElementById('dailyForm').style.display = 'none';
+            document.getElementById('branchSelect').value = '';
+            document.getElementById('recordDate').value = new Date().toISOString().split('T')[0];
+            submitBtn.disabled = false;
+            submitBtn.innerText = 'إرسال القراءات اليومية';
+        })
+        .catch(err => {
+            alert('حدث خطأ أثناء الإرسال.');
+            submitBtn.disabled = false;
+            submitBtn.innerText = 'إرسال القراءات اليومية';
+        });
+    }
+</script>
+
+</body>
+</html>
